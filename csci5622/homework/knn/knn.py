@@ -33,7 +33,7 @@ class Knearest:
     kNN classifier
     """
 
-    def __init__(self, x, y, k=5):
+    def __init__(self, x, y, k):
         """
         Creates a kNN instance
 
@@ -45,6 +45,7 @@ class Knearest:
         # You can modify the constructor, but you shouldn't need to.
         # Do not use another data structure from anywhere else to
         # complete the assignment.
+
 
         self._kdtree = BallTree(x)
         self._y = y
@@ -61,31 +62,30 @@ class Knearest:
 
         #print self._k
         #print len(item_indices)
-        #assert len(item_indices) == self._k, "Did not get k inputs"
+        assert len(item_indices) == self._k, "Did not get k inputs"
 
-        maximum_count = Counter(item_indices)
-        sorted_items = sorted(maximum_count.items(), key=operator.itemgetter(1))
+        sub_arr = []
+        for i in item_indices:
+            sub_arr.append(self._y[i])
 
-        #check for a tie
-        values = np.array([i for j,i in sorted(maximum_count.iteritems())])
-        tie_checker = np.bincount(values)
+        values_array = np.array(sub_arr)
 
-        if max(tie_checker) > 1:
-            #if a tie occurs
-            number_of_ties = max(tie_checker)
-            find_ties = sorted_items[len(sorted_items) - number_of_ties:]
-            ties = []
-            for i in find_ties:
-                ties.append(i[1])
-            
-            ties = np.array(ties, dtype=np.float64)
+        c = Counter(values_array)
 
-            return np.median(ties)
+        vals = [i for j,i in sorted(c.iteritems(), key=operator.itemgetter(1))]
+        tup_key_vals = [(j,i) for j,i in sorted(c.iteritems(), key=operator.itemgetter(1))]
+
+        max_val = max(vals)
+
+        tie_counter = 0
+        for i in vals:
+            if i == max_val:
+                tie_counter += 1
+
+        if tie_counter > 1:
+            return np.median(values_array)
         else:
-            #no tie
-            maximum = sorted_items[len(sorted_items)-1]
-
-            return maximum[1]
+            return tup_key_vals[len(tup_key_vals)-1][0]
 
         
         # Finish this function to return the most common y label for
@@ -103,13 +103,15 @@ class Knearest:
         format as training data
         """
 
-        most_common_label = self.majority(example)
+        #reshape for 1-vec
+        example = np.array(example, dtype=np.float32)
+        example = example.reshape(1,-1)
 
-        clf = neighbors.KNeighborsClassifier()
-        clf.fit(self._kdtree, self._y)
+        dist, ind = self._kdtree.query(example, self._k)
 
-        return clf.predict(example)
+        prediction_variable = self.majority(ind[0])
 
+        return prediction_variable
 
         # Finish this function to find the k closest points, query the
         # majority function, and return the predicted label.
@@ -117,8 +119,7 @@ class Knearest:
         # and definitely needs to be changed. 
 
         """
-        return self.majority(list(random.randrange(len(self._y)) \
-                                  for x in xrange(self._k)))
+        return self.majority(list(random.randrange(len(self._y)) for x in xrange(self._k)))
         """
 
     def confusion_matrix(self, test_x, test_y):
@@ -139,10 +140,17 @@ class Knearest:
         d = defaultdict(dict)
         data_index = 0
         for xx, yy in zip(test_x, test_y):
-            print self.classify(xx), yy
+            predict_var = self.classify(xx)
+
+            try:
+                d[yy][predict_var] += 1
+            except KeyError:
+                d[yy][predict_var] = 1
+            
             data_index += 1
             if data_index % 100 == 0:
                 print("%i/%i for confusion matrix" % (data_index, len(test_x)))
+
         return d
 
     @staticmethod
