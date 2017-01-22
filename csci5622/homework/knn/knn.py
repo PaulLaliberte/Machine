@@ -106,7 +106,7 @@ class Knearest:
         """
 
         #reshape for 1-vec
-        example = np.array(example, dtype=np.float32)
+        example = np.array(example, dtype=np.float64)
         example = example.reshape(1,-1)
 
         dist, ind = self._kdtree.query(example, self._k)
