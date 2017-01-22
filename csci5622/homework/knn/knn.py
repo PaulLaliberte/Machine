@@ -67,9 +67,9 @@ class Knearest:
         for i in item_indices:
             sub_arr.append(self._y[i])
 
-        values_array = np.array(sub_arr)
+        values_array = np.array(sub_arr, dtype=np.float64)
 
-        c = Counter(values_array)
+        c = Counter(sub_arr)
 
         vals = [i for j,i in sorted(c.iteritems(), key=operator.itemgetter(1))]
         tup_key_vals = [(j,i) for j,i in sorted(c.iteritems(), key=operator.itemgetter(1))]
