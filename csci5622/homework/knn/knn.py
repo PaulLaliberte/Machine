@@ -48,7 +48,6 @@ class Knearest:
         # Do not use another data structure from anywhere else to
         # complete the assignment.
 
-
         self._kdtree = BallTree(x)
         self._y = y
         self._k = k
@@ -62,8 +61,6 @@ class Knearest:
         :param item_indices: The indices of the k nearest neighbors
         """
 
-        #print self._k
-        #print len(item_indices)
         assert len(item_indices) == self._k, "Did not get k inputs"
 
         sub_arr = []
