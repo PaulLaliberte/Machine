@@ -23,7 +23,6 @@ class TestKnn(unittest.TestCase):
 
     def test2(self):
         self.assertAlmostEqual(self.knn[2].classify(self.queries[0]), 1)
-        print self.knn[2].classify(self.queries[1])
         self.assertAlmostEqual(self.knn[2].classify(self.queries[1]), 0)
         self.assertAlmostEqual(self.knn[2].classify(self.queries[2]), 0)
         self.assertAlmostEqual(self.knn[2].classify(self.queries[3]), -1)
