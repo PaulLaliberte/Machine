@@ -8,6 +8,8 @@ from numpy import median
 from sklearn import neighbors
 from sklearn.neighbors import BallTree
 
+#TODO: Analysis Report
+
 class Numbers:
     """
     Class to store MNIST data
