@@ -78,8 +78,10 @@ class Knearest:
 
         tie_counter = 0
         for i in vals:
-            if i == max_val:
+            if i == max_val and tie_counter <= 1:
                 tie_counter += 1
+            else:
+                break
 
         if tie_counter > 1:
             return np.median(values_array)
