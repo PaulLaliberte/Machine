@@ -84,7 +84,6 @@ class Knearest:
                 break
 
         if tie_counter > 1:
-            print 'here'
             return np.median(values_array)
         else:
             return tup_key_vals[len(tup_key_vals)-1][0]
