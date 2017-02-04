@@ -37,6 +37,7 @@ class TestLogReg(unittest.TestCase):
         print(self.logreg_unreg.w)
         print(kPOS.x)
         w = self.logreg_unreg.sg_update(kPOS, 0)
+        print w, '\n'
         self.assertAlmostEqual(w[0], .5)
         self.assertAlmostEqual(w[1], 2.0)
         self.assertAlmostEqual(w[2], 1.5)
@@ -46,6 +47,7 @@ class TestLogReg(unittest.TestCase):
         print(self.logreg_unreg.w)
         print(kNEG.x)
         w = self.logreg_unreg.sg_update(kNEG, 1)
+        print w, '\n'
         self.assertAlmostEqual(w[0], -0.49330714907571527)
         self.assertAlmostEqual(w[1], 2.0)
         self.assertAlmostEqual(w[2], -0.48661429815143054)

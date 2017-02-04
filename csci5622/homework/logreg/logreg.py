@@ -41,6 +41,7 @@ class Example:
         self.nonzero = {}
         self.y = label
         self.x = zeros(len(vocab))
+
         for word, count in [x.split(":") for x in words]:
             if word in vocab:
                 assert word != kBIAS, "Bias can't actually appear in document"
@@ -50,7 +51,7 @@ class Example:
 
 
 class LogReg:
-    def __init__(self, num_features, lam, eta=lambda x: 0.1):
+    def __init__(self, num_features, lam, eta=lambda x: x):
         """
         Create a logistic regression classifier
 
@@ -100,11 +101,12 @@ class LogReg:
         """
 
         #unregularized
+        #NOTE: learning_rate will fail in test too, we don't update it
+        eta = self.eta(iteration)
         y_i = train_example.y
         sigm = sigmoid(np.dot(self.w, train_example.x))
-        nu = 1.0
 
-        w_k = self.w + nu * (y_i - sigm) * train_example.x
+        w_k = self.w + eta * (y_i - sigm) * train_example.x
 
         self.w = w_k
         
