@@ -1,5 +1,6 @@
 import random
 import argparse
+import numpy as np
 
 from numpy import zeros, sign 
 from math import exp, log
@@ -88,7 +89,7 @@ class LogReg:
 
         return logprob, float(num_right) / float(len(examples))
 
-    def sg_update(self, train_example, iteration, use_tfidf=False):
+    def sg_update(self, train_example, iteration, use_tfidf=True):
         """
         Compute a stochastic gradient update to improve the log likelihood.
 
@@ -97,10 +98,34 @@ class LogReg:
         :param use_tfidf: A boolean to switch between the raw data and the tfidf representation
         :return: Return the new value of the regression coefficients
         """
-        
-        # TODO: Implement updates in this function
 
+        #unregularized
+        y_i = train_example.y
+        sigm = sigmoid(np.dot(self.w, train_example.x))
+        nu = 1.0
+
+        w_k = self.w + nu * (y_i - sigm) * train_example.x
+
+        self.w = w_k
+        
+        #TODO: regularized
+
+        """
+        print train_example.nonzero
+        print train_example.y
+        print train_example.x
+        
+        print iteration
+        print use_tfidf
+        print self.w
+        print '\n'
+        """
         return self.w
+
+def eta_schedule(iteration):
+    # TODO (extra credit): Update this function to provide an
+    # EFFECTIVE iteration dependent learning rate size.  
+    return 1.0 
 
 def read_dataset(positive, negative, vocab, test_proportion=0.1):
     """
@@ -133,10 +158,7 @@ def read_dataset(positive, negative, vocab, test_proportion=0.1):
 
     return train, test, vocab
 
-def eta_schedule(iteration):
-    # TODO (extra credit): Update this function to provide an
-    # EFFECTIVE iteration dependent learning rate size.  
-    return 1.0 
+
 
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
@@ -145,16 +167,17 @@ if __name__ == "__main__":
     argparser.add_argument("--eta", help="Initial SG learning rate",
                            type=float, default=0.1, required=False)
     argparser.add_argument("--positive", help="Positive class",
-                           type=str, default="../data/hockey_baseball/positive", required=False)
+                           type=str, default="../data/autos_motorcycles/positive", required=False)
     argparser.add_argument("--negative", help="Negative class",
-                           type=str, default="../data/hockey_baseball/negative", required=False)
+                           type=str, default="../data/autos_motorcycles/negative", required=False)
     argparser.add_argument("--vocab", help="Vocabulary that can be features",
-                           type=str, default="../data/hockey_baseball/vocab", required=False)
+                           type=str, default="../data/autos_motorcycles/vocab", required=False)
     argparser.add_argument("--passes", help="Number of passes through train",
                            type=int, default=1, required=False)
 
     args = argparser.parse_args()
     train, test, vocab = read_dataset(args.positive, args.negative, args.vocab)
+    
 
     print("Read in %i train and %i test" % (len(train), len(test)))
 
@@ -167,6 +190,7 @@ if __name__ == "__main__":
         random.shuffle(train)
         for ex in train:
             lr.sg_update(ex, iteration)
+
             if iteration % 5 == 1:
                 train_lp, train_acc = lr.progress(train)
                 ho_lp, ho_acc = lr.progress(test)
