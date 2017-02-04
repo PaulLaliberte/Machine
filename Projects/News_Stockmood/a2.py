@@ -1,7 +1,7 @@
 
 
 import numpy as np
-import csv
+import csv, string
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -25,7 +25,11 @@ def read_and_clean_data(fname, remove_stops=True):
             words = [w for w in words if not w in stops] if remove_stops else words
             text.append(' '.join(words))
 
-    return text, labels
+        text_without_punc = []
+        for s in text:
+            text_without_punc.append(s.translate(None, string.punctuation))
+
+    return text_without_punc, labels
 
 #example of training data and their classification
 text_train, labels_train = read_and_clean_data('cDJIA_train.tsv', remove_stops=True)
