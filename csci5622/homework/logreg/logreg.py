@@ -101,7 +101,7 @@ class LogReg:
         """
 
         #unregularized
-        #NOTE: learning_rate will fail in test too, we don't update it
+
         eta = self.eta(iteration)
         y_i = train_example.y
         sigm = sigmoid(np.dot(self.w, train_example.x))
