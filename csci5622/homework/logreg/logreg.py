@@ -1,6 +1,8 @@
 import random
 import argparse
 import numpy as np
+import copy
+import operator
 
 from numpy import zeros, sign 
 from math import exp, log
@@ -12,6 +14,7 @@ kBIAS = "BIAS_CONSTANT"
 
 random.seed(kSEED)
 
+#TODO: Analysis, Extra Credit, 
 
 def sigmoid(score, threshold=20.0):
     """
@@ -38,6 +41,7 @@ class Example:
         :param words: The words in a list of "word:count" format
         :param vocab: The vocabulary to use as features (list)
         """
+
         self.nonzero = {}
         self.y = label
         self.x = zeros(len(vocab))
@@ -64,31 +68,41 @@ class LogReg:
         self.lam = lam
         self.eta = eta
         self.last_update = defaultdict(int)
-
-        set_dic = 0
-        for i in range(0, len(self.w)):
-            self.last_update[set_dic] = 0
-            set_dic += 1
+        self.best_predict = None
 
         self.last_update['number_at'] = 0
 
         assert self.lam>= 0, "Regularization parameter must be non-negative"
 
-    def progress(self, examples):
+    def progress(self, examples, vocab, find_best=False):
         """
         Given a set of examples, compute the probability and accuracy
 
         :param examples: The dataset to score
         :return: A tuple of (log probability, accuracy)
         """
+        if self.best_predict == None:
+            self.best_predict = {i : None for i in vocab}
 
         logprob = 0.0
         num_right = 0
         for ex in examples:
             p = sigmoid(self.w.dot(ex.x))
             if ex.y == 1:
+                if find_best is True:
+                    for key,value in ex.nonzero.items():
+                        try:
+                            self.best_predict[value] += 1
+                        except TypeError:
+                            self.best_predict[value] = 1
                 logprob += log(p)
             else:
+                if find_best is True:
+                    for key,value in ex.nonzero.items():
+                        try:
+                            self.best_predict[value] -= 1
+                        except TypeError:
+                            self.best_predict[value] = -1
                 logprob += log(1.0 - p)
 
             # Get accuracy
@@ -97,7 +111,7 @@ class LogReg:
 
         return logprob, float(num_right) / float(len(examples))
 
-    def sg_update(self, train_example, iteration, use_tfidf=True):
+    def sg_update(self, train_example, iteration):
         """
         Compute a stochastic gradient update to improve the log likelihood.
 
@@ -121,7 +135,7 @@ class LogReg:
         #regularized
         #NOTE: For exponent update, add an extra +1, to take into account the current
         #      regularization too
-
+        
         eta = self.eta(iteration)
         y_i = train_example.y
         sigm = sigmoid(np.dot(self.w, train_example.x))
@@ -160,7 +174,7 @@ class LogReg:
             ind_counter += 1
 
         self.last_update['number_at'] += 1
-  
+
         return self.w
 
 def eta_schedule(iteration):
@@ -215,10 +229,10 @@ if __name__ == "__main__":
                            type=str, default="../data/autos_motorcycles/vocab", required=False)
     argparser.add_argument("--passes", help="Number of passes through train",
                            type=int, default=1, required=False)
+    argparser.add_argument("--best", help="Print best/worst words", type=bool, default=False, required=False)
 
     args = argparser.parse_args()
     train, test, vocab = read_dataset(args.positive, args.negative, args.vocab)
-    
 
     print("Read in %i train and %i test" % (len(train), len(test)))
 
@@ -233,8 +247,20 @@ if __name__ == "__main__":
             lr.sg_update(ex, iteration)
 
             if iteration % 5 == 1:
-                train_lp, train_acc = lr.progress(train)
-                ho_lp, ho_acc = lr.progress(test)
+                train_lp, train_acc = lr.progress(train, vocab, False)
+                ho_lp, ho_acc = lr.progress(test, vocab, args.best)
                 print("Update %i\tTP %f\tHP %f\tTA %f\tHA %f" %
                       (iteration, train_lp, ho_lp, train_acc, ho_acc))
             iteration += 1
+
+    if args.best == True:
+        predict = { k : v for k,v in lr.best_predict.items() if v != None }
+        bad_predict = { k : v for k,v in predict.items() if v == 0 }
+        bike_predict = sorted(predict.items(), key=operator.itemgetter(1), reverse=True)[:20]
+        auto_predict = sorted(predict.items(), key=operator.itemgetter(1))[:20]
+
+        print "Best 20 words for 'bike' prediction: ", bike_predict, '\n'
+        print "Best 20 words for 'auto' prediction: ", auto_predict, '\n'
+        print "Bad words for both:", bad_predict
+
+
