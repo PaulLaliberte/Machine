@@ -65,6 +65,13 @@ class LogReg:
         self.eta = eta
         self.last_update = defaultdict(int)
 
+        set_dic = 0
+        for i in range(0, len(self.w)):
+            self.last_update[set_dic] = 0
+            set_dic += 1
+
+        self.last_update['number_at'] = 0
+
         assert self.lam>= 0, "Regularization parameter must be non-negative"
 
     def progress(self, examples):
@@ -100,8 +107,8 @@ class LogReg:
         :return: Return the new value of the regression coefficients
         """
 
+        """
         #unregularized
-
         eta = self.eta(iteration)
         y_i = train_example.y
         sigm = sigmoid(np.dot(self.w, train_example.x))
@@ -109,19 +116,51 @@ class LogReg:
         w_k = self.w + eta * (y_i - sigm) * train_example.x
 
         self.w = w_k
+        """
         
-        #TODO: regularized
+        #regularized
+        #NOTE: For exponent update, add an extra +1, to take into account the current
+        #      regularization too
 
-        """
-        print train_example.nonzero
-        print train_example.y
-        print train_example.x
-        
-        print iteration
-        print use_tfidf
-        print self.w
-        print '\n'
-        """
+        eta = self.eta(iteration)
+        y_i = train_example.y
+        sigm = sigmoid(np.dot(self.w, train_example.x))
+
+        indices_to_update = np.array([], dtype=np.int64)
+        ind_counter = 0
+
+        for i in train_example.x:
+            if i != 0:
+                indices_to_update = np.insert(indices_to_update, 
+                                              len(indices_to_update), ind_counter)
+
+            ind_counter += 1
+
+        for i in indices_to_update:
+            self.w[i] = self.w[i] + eta * (y_i - sigm) * train_example.x[i]
+
+        shrink_fact = 1 - 2*eta*self.lam
+
+        for i in indices_to_update:
+            if i != 0:
+                if self.last_update[i] != self.last_update['number_at']:
+                    exponent = self.last_update['number_at'] - self.last_update[i] + 1
+                    self.w[i] = self.w[i] * (shrink_fact ** exponent)
+                    self.last_update[i] = self.last_update['number_at'] 
+                else:
+                    self.w[i] = self.w[i] * shrink_fact
+
+        length_of_vec = len(self.w)
+        ind_counter = 1
+
+        while ind_counter <= length_of_vec:
+            if ind_counter in indices_to_update:
+                self.last_update[ind_counter] += 1
+
+            ind_counter += 1
+
+        self.last_update['number_at'] += 1
+  
         return self.w
 
 def eta_schedule(iteration):
