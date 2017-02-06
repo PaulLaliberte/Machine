@@ -7,6 +7,7 @@ import operator
 from numpy import zeros, sign 
 from math import exp, log
 from collections import defaultdict
+import pandas as pd
 
 
 kSEED = 1735
@@ -256,11 +257,14 @@ if __name__ == "__main__":
     if args.best == True:
         predict = { k : v for k,v in lr.best_predict.items() if v != None }
         bad_predict = { k : v for k,v in predict.items() if v == 0 }
-        bike_predict = sorted(predict.items(), key=operator.itemgetter(1), reverse=True)[:20]
-        auto_predict = sorted(predict.items(), key=operator.itemgetter(1))[:20]
+        bike_predict = dict(sorted(predict.items(), key=operator.itemgetter(1), reverse=True)[:20])
+        auto_predict = dict(sorted(predict.items(), key=operator.itemgetter(1))[:20])
 
         print "Best 20 words for 'bike' prediction: ", bike_predict, '\n'
         print "Best 20 words for 'auto' prediction: ", auto_predict, '\n'
         print "Bad words for both:", bad_predict
+        
+        print pd.DataFrame(bike_predict.items()), '\n'
 
+        print pd.DataFrame(auto_predict.items())
 
