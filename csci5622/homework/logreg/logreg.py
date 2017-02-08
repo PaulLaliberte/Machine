@@ -3,11 +3,12 @@ import argparse
 import numpy as np
 import copy
 import operator
+import pandas as pd
+#import matplotlib.pyplot as plt
 
 from numpy import zeros, sign 
 from math import exp, log
 from collections import defaultdict
-import pandas as pd
 
 
 kSEED = 1735
@@ -15,7 +16,7 @@ kBIAS = "BIAS_CONSTANT"
 
 random.seed(kSEED)
 
-#TODO: Analysis, Extra Credit, 
+#TODO: Fix up analysis, learning rate schedule - if time
 
 def sigmoid(score, threshold=20.0):
     """
@@ -42,10 +43,11 @@ class Example:
         :param words: The words in a list of "word:count" format
         :param vocab: The vocabulary to use as features (list)
         """
-
         self.nonzero = {}
+        self.df = zeros(len(vocab))
         self.y = label
         self.x = zeros(len(vocab))
+
 
         for word, count in [x.split(":") for x in words]:
             if word in vocab:
@@ -54,12 +56,20 @@ class Example:
                 self.nonzero[vocab.index(word)] = word
         self.x[0] = 1
 
+        #NOTE: ec2, df dict... need df != None for test
+        if df != None:
+            for word, count in [x.split(":") for x in words]:
+                if word in vocab:
+                    self.df[vocab.index(word)] = df[vocab.index(word)] 
+
+
+
+
 
 class LogReg:
     def __init__(self, num_features, lam, eta=lambda x: x):
         """
         Create a logistic regression classifier
-
         :param num_features: The number of features (including bias)
         :param lam: Regularization parameter
         :param eta: A function that takes the iteration as an argument (the default is a constant value)
@@ -70,6 +80,7 @@ class LogReg:
         self.eta = eta
         self.last_update = defaultdict(int)
         self.best_predict = None
+        self.tf_idf = []
 
         self.last_update['number_at'] = 0
 
@@ -78,10 +89,10 @@ class LogReg:
     def progress(self, examples, vocab, find_best=False):
         """
         Given a set of examples, compute the probability and accuracy
-
         :param examples: The dataset to score
         :return: A tuple of (log probability, accuracy)
         """
+
         if self.best_predict == None:
             self.best_predict = {i : None for i in vocab}
 
@@ -112,10 +123,9 @@ class LogReg:
 
         return logprob, float(num_right) / float(len(examples))
 
-    def sg_update(self, train_example, iteration):
+    def sg_update(self, train_example, iteration, use_tfidf=True):
         """
         Compute a stochastic gradient update to improve the log likelihood.
-
         :param train_example: The example to take the gradient with respect to
         :param iteration: The current iteration (an integer)
         :param use_tfidf: A boolean to switch between the raw data and the tfidf representation
@@ -127,56 +137,120 @@ class LogReg:
         eta = self.eta(iteration)
         y_i = train_example.y
         sigm = sigmoid(np.dot(self.w, train_example.x))
-
         w_k = self.w + eta * (y_i - sigm) * train_example.x
-
         self.w = w_k
         """
         
         #regularized
         #NOTE: For exponent update, add an extra +1, to take into account the current
         #      regularization too
-        
-        eta = self.eta(iteration)
-        y_i = train_example.y
-        sigm = sigmoid(np.dot(self.w, train_example.x))
 
-        indices_to_update = np.array([], dtype=np.int64)
-        ind_counter = 0
 
-        for i in train_example.x:
-            if i != 0:
-                indices_to_update = np.insert(indices_to_update, 
-                                              len(indices_to_update), ind_counter)
+        if use_tfidf == True:
+            df = train_example.df
 
-            ind_counter += 1
+            words = [t for idf,t in train_example.nonzero.items()]
+            total_count = len(words)
+            tf = {t : 0 for idf,t in train_example.nonzero.items()}
 
-        for i in indices_to_update:
-            self.w[i] = self.w[i] + eta * (y_i - sigm) * train_example.x[i]
+            for i in words:
+                tf[i] += 1
 
-        shrink_fact = 1 - 2*eta*self.lam
+            for t,n in tf.items():
+                tf[t] = float(n) / total_count
 
-        for i in indices_to_update:
-            if i != 0:
-                if self.last_update[i] != self.last_update['number_at']:
-                    exponent = self.last_update['number_at'] - self.last_update[i] + 1
-                    self.w[i] = self.w[i] * (shrink_fact ** exponent)
-                    self.last_update[i] = self.last_update['number_at'] 
-                else:
-                    self.w[i] = self.w[i] * shrink_fact
+            
+            for ind,t in train_example.nonzero.items():
+                df_count = df[ind]
+                df[ind] = np.log(1192 / (1 + df_count))
 
-        length_of_vec = len(self.w)
-        ind_counter = 1
+            for ind,t in train_example.nonzero.items():
+                df[ind] = df[ind] * tf[t]
 
-        while ind_counter <= length_of_vec:
-            if ind_counter in indices_to_update:
-                self.last_update[ind_counter] += 1
 
-            ind_counter += 1
+            eta = self.eta(iteration)
+            y_i = train_example.y
+            sigm = sigmoid(np.dot(self.w, df))
 
-        self.last_update['number_at'] += 1
+            indices_to_update = np.array([], dtype=np.int64)
+            ind_counter = 0
 
-        return self.w
+            for i in df:
+                if i != 0:
+                    indices_to_update = np.insert(indices_to_update, 
+                                                  len(indices_to_update), ind_counter)
+
+                ind_counter += 1
+
+            for i in indices_to_update:
+                self.w[i] = self.w[i] + eta * (y_i - sigm) * df[i]
+
+            shrink_fact = 1 - 2*eta*self.lam
+
+            for i in indices_to_update:
+                if i != 0:
+                    if self.last_update[i] != self.last_update['number_at']:
+                        exponent = self.last_update['number_at'] - self.last_update[i] + 1
+                        self.w[i] = self.w[i] * (shrink_fact ** exponent)
+                        self.last_update[i] = self.last_update['number_at'] 
+                    else:
+                        self.w[i] = self.w[i] * shrink_fact
+
+            length_of_vec = len(self.w)
+            ind_counter = 1
+
+            while ind_counter <= length_of_vec:
+                if ind_counter in indices_to_update:
+                    self.last_update[ind_counter] += 1
+
+                ind_counter += 1
+
+            self.last_update['number_at'] += 1
+
+            return self.w
+
+        else:
+            eta = self.eta(iteration)
+            y_i = train_example.y
+            sigm = sigmoid(np.dot(self.w, train_example.x))
+
+            indices_to_update = np.array([], dtype=np.int64)
+            ind_counter = 0
+
+            for i in train_example.x:
+                if i != 0:
+                    indices_to_update = np.insert(indices_to_update, 
+                                                  len(indices_to_update), ind_counter)
+
+                ind_counter += 1
+
+            for i in indices_to_update:
+                self.w[i] = self.w[i] + eta * (y_i - sigm) * train_example.x[i]
+
+            shrink_fact = 1 - 2*eta*self.lam
+
+            for i in indices_to_update:
+                if i != 0:
+                    if self.last_update[i] != self.last_update['number_at']:
+                        exponent = self.last_update['number_at'] - self.last_update[i] + 1
+                        self.w[i] = self.w[i] * (shrink_fact ** exponent)
+                        self.last_update[i] = self.last_update['number_at'] 
+                    else:
+                        self.w[i] = self.w[i] * shrink_fact
+
+            length_of_vec = len(self.w)
+            ind_counter = 1
+
+            while ind_counter <= length_of_vec:
+                if ind_counter in indices_to_update:
+                    self.last_update[ind_counter] += 1
+
+                ind_counter += 1
+
+            self.last_update['number_at'] += 1
+
+            return self.w
+
 
 def eta_schedule(iteration):
     # TODO (extra credit): Update this function to provide an
@@ -186,7 +260,6 @@ def eta_schedule(iteration):
 def read_dataset(positive, negative, vocab, test_proportion=0.1):
     """
     Reads in a text dataset with a given vocabulary
-
     :param positive: Positive examples
     :param negative: Negative examples
     :param vocab: A list of vocabulary words
@@ -212,7 +285,7 @@ def read_dataset(positive, negative, vocab, test_proportion=0.1):
     random.shuffle(train)
     random.shuffle(test)
 
-    return train, test, vocab
+    return train, test, vocab, df
 
 
 
@@ -231,9 +304,10 @@ if __name__ == "__main__":
     argparser.add_argument("--passes", help="Number of passes through train",
                            type=int, default=1, required=False)
     argparser.add_argument("--best", help="Print best/worst words", type=bool, default=False, required=False)
+    argparser.add_argument("--tfidf", help="Use tf-idf", type=bool, default=False, required=False)
 
     args = argparser.parse_args()
-    train, test, vocab = read_dataset(args.positive, args.negative, args.vocab)
+    train, test, vocab, df = read_dataset(args.positive, args.negative, args.vocab)
 
     print("Read in %i train and %i test" % (len(train), len(test)))
 
@@ -245,7 +319,7 @@ if __name__ == "__main__":
     for pp in xrange(args.passes):
         random.shuffle(train)
         for ex in train:
-            lr.sg_update(ex, iteration)
+            lr.sg_update(ex, iteration, args.tfidf)
 
             if iteration % 5 == 1:
                 train_lp, train_acc = lr.progress(train, vocab, False)
@@ -255,16 +329,36 @@ if __name__ == "__main__":
             iteration += 1
 
     if args.best == True:
-        predict = { k : v for k,v in lr.best_predict.items() if v != None }
-        bad_predict = { k : v for k,v in predict.items() if v == 0 }
-        bike_predict = dict(sorted(predict.items(), key=operator.itemgetter(1), reverse=True)[:20])
-        auto_predict = dict(sorted(predict.items(), key=operator.itemgetter(1))[:20])
+        #dataframes of best,worst features
 
-        print "Best 20 words for 'bike' prediction: ", bike_predict, '\n'
-        print "Best 20 words for 'auto' prediction: ", auto_predict, '\n'
-        print "Bad words for both:", bad_predict
+        predict_cycle = { k : v for k,v in lr.best_predict_cycle.items() if v != None }
+        predict_auto = { k : v for k,v in lr.best_predict_auto.items() if v != None }
+
+        cycle_predict = dict(sorted(predict_cycle.items(), key=operator.itemgetter(1), reverse=True)[:20])
+        auto_predict = dict(sorted(predict_auto.items(), key=operator.itemgetter(1), reverse=True)[:20])
+        worst_cycle = dict(sorted(predict_cycle.items(), key=operator.itemgetter(1))[:20])
+        worst_auto = dict(sorted(predict_auto.items(), key=operator.itemgetter(1))[:20])
+
+
+        df_best_cycle = pd.DataFrame(cycle_predict.items(), columns=['term', 'count'])
+        df_worst_cycle = pd.DataFrame(worst_cycle.items(), columns=['term', 'count'])
+        df_best_auto = pd.DataFrame(auto_predict.items(), columns=['term', 'count'])
+        df_worst_auto = pd.DataFrame(worst_auto.items(), columns=['term', 'count'])
+
+        df_best_cycle.to_pickle('best_cycle')
+        df_worst_cycle.to_pickle('worst_cycle')
+        df_best_auto.to_pickle('best_auto')
+        df_worst_auto.to_pickle('worst_auto')
         
-        print pd.DataFrame(bike_predict.items()), '\n'
+    """
+    #Plot for analysis
+    #uncomment import at top
+    plt.ylim(ymin=.45, ymax=1.0)
+    plt.xlim(xmin=0, xmax=5291)
+    plt.plot(plot_update, plot_accuracy, 'g.')
+    plt.ylabel('Accuracy on Test Data')
+    plt.xlabel('Iteration of Update')
+    plt.show()
+    """
 
-        print pd.DataFrame(auto_predict.items())
 
