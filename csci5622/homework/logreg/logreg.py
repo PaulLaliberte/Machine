@@ -80,7 +80,6 @@ class LogReg:
         self.eta = eta
         self.last_update = defaultdict(int)
         self.best_predict = None
-        self.tf_idf = []
 
         self.last_update['number_at'] = 0
 
@@ -123,7 +122,7 @@ class LogReg:
 
         return logprob, float(num_right) / float(len(examples))
 
-    def sg_update(self, train_example, iteration, use_tfidf=True):
+    def sg_update(self, train_example, iteration, use_tfidf=False):
         """
         Compute a stochastic gradient update to improve the log likelihood.
         :param train_example: The example to take the gradient with respect to
@@ -145,111 +144,72 @@ class LogReg:
         #NOTE: For exponent update, add an extra +1, to take into account the current
         #      regularization too
 
+        df = train_example.df
 
-        if use_tfidf == True:
-            df = train_example.df
+        words = [t for idf,t in train_example.nonzero.items()]
+        total_count = len(words)
+        tf = {t : 0 for idf,t in train_example.nonzero.items()}
 
-            words = [t for idf,t in train_example.nonzero.items()]
-            total_count = len(words)
-            tf = {t : 0 for idf,t in train_example.nonzero.items()}
+        for i in words:
+            tf[i] += 1
 
-            for i in words:
-                tf[i] += 1
-
-            for t,n in tf.items():
-                tf[t] = float(n) / total_count
+        for t,n in tf.items():
+            tf[t] = float(n) / total_count
 
             
-            for ind,t in train_example.nonzero.items():
-                df_count = df[ind]
-                df[ind] = np.log(1192 / (1 + df_count))
+        for ind,t in train_example.nonzero.items():
+            df_count = df[ind]
+            df[ind] = np.log(1192 / (1 + df_count))
 
-            for ind,t in train_example.nonzero.items():
-                df[ind] = df[ind] * tf[t]
+        for ind,t in train_example.nonzero.items():
+            df[ind] = df[ind] * tf[t]
+
+        assert len(train_example.x) == len(df)
+
+        if use_tfidf == False:
+            df = train_example.x
 
 
-            eta = self.eta(iteration)
-            y_i = train_example.y
-            sigm = sigmoid(np.dot(self.w, df))
+        eta = self.eta(iteration)
+        y_i = train_example.y
+        sigm = sigmoid(np.dot(self.w, df))
 
-            indices_to_update = np.array([], dtype=np.int64)
-            ind_counter = 0
+        indices_to_update = np.array([], dtype=np.int64)
+        ind_counter = 0
 
-            for i in df:
-                if i != 0:
-                    indices_to_update = np.insert(indices_to_update, 
+        for i in df:
+            if i != 0:
+                indices_to_update = np.insert(indices_to_update, 
                                                   len(indices_to_update), ind_counter)
 
-                ind_counter += 1
+            ind_counter += 1
 
-            for i in indices_to_update:
-                self.w[i] = self.w[i] + eta * (y_i - sigm) * df[i]
+        for i in indices_to_update:
+            self.w[i] = self.w[i] + eta * (y_i - sigm) * df[i]
 
-            shrink_fact = 1 - 2*eta*self.lam
+        shrink_fact = 1 - 2*eta*self.lam
 
-            for i in indices_to_update:
-                if i != 0:
-                    if self.last_update[i] != self.last_update['number_at']:
-                        exponent = self.last_update['number_at'] - self.last_update[i] + 1
-                        self.w[i] = self.w[i] * (shrink_fact ** exponent)
-                        self.last_update[i] = self.last_update['number_at'] 
-                    else:
-                        self.w[i] = self.w[i] * shrink_fact
+        for i in indices_to_update:
+            if i != 0:
+                if self.last_update[i] != self.last_update['number_at']:
+                    exponent = self.last_update['number_at'] - self.last_update[i] + 1
+                    self.w[i] = self.w[i] * (shrink_fact ** exponent)
+                    self.last_update[i] = self.last_update['number_at'] 
+                else:
+                    self.w[i] = self.w[i] * shrink_fact
 
-            length_of_vec = len(self.w)
-            ind_counter = 1
+        length_of_vec = len(self.w)
+        ind_counter = 1
 
-            while ind_counter <= length_of_vec:
-                if ind_counter in indices_to_update:
-                    self.last_update[ind_counter] += 1
+        while ind_counter <= length_of_vec:
+            if ind_counter in indices_to_update:
+                self.last_update[ind_counter] += 1
 
-                ind_counter += 1
+            ind_counter += 1
 
-            self.last_update['number_at'] += 1
+        self.last_update['number_at'] += 1
 
-            return self.w
-
-        else:
-            eta = self.eta(iteration)
-            y_i = train_example.y
-            sigm = sigmoid(np.dot(self.w, train_example.x))
-
-            indices_to_update = np.array([], dtype=np.int64)
-            ind_counter = 0
-
-            for i in train_example.x:
-                if i != 0:
-                    indices_to_update = np.insert(indices_to_update, 
-                                                  len(indices_to_update), ind_counter)
-
-                ind_counter += 1
-
-            for i in indices_to_update:
-                self.w[i] = self.w[i] + eta * (y_i - sigm) * train_example.x[i]
-
-            shrink_fact = 1 - 2*eta*self.lam
-
-            for i in indices_to_update:
-                if i != 0:
-                    if self.last_update[i] != self.last_update['number_at']:
-                        exponent = self.last_update['number_at'] - self.last_update[i] + 1
-                        self.w[i] = self.w[i] * (shrink_fact ** exponent)
-                        self.last_update[i] = self.last_update['number_at'] 
-                    else:
-                        self.w[i] = self.w[i] * shrink_fact
-
-            length_of_vec = len(self.w)
-            ind_counter = 1
-
-            while ind_counter <= length_of_vec:
-                if ind_counter in indices_to_update:
-                    self.last_update[ind_counter] += 1
-
-                ind_counter += 1
-
-            self.last_update['number_at'] += 1
-
-            return self.w
+        return self.w
 
 
 def eta_schedule(iteration):
@@ -304,7 +264,7 @@ if __name__ == "__main__":
     argparser.add_argument("--passes", help="Number of passes through train",
                            type=int, default=1, required=False)
     argparser.add_argument("--best", help="Print best/worst words", type=bool, default=False, required=False)
-    argparser.add_argument("--tfidf", help="Use tf-idf", type=bool, default=False, required=False)
+    argparser.add_argument("--tfidf", help="Use tf-idf", type=str, default='False', required=False)
 
     args = argparser.parse_args()
     train, test, vocab, df = read_dataset(args.positive, args.negative, args.vocab)
@@ -316,10 +276,14 @@ if __name__ == "__main__":
 
     # Iterations
     iteration = 0
+    use_tfidf = False
+    if args.tfidf == 'True':
+        use_tfidf = True
+
     for pp in xrange(args.passes):
         random.shuffle(train)
         for ex in train:
-            lr.sg_update(ex, iteration, args.tfidf)
+            lr.sg_update(ex, iteration, use_tfidf)
 
             if iteration % 5 == 1:
                 train_lp, train_acc = lr.progress(train, vocab, False)
