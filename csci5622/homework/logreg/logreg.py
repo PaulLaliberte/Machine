@@ -138,27 +138,32 @@ class LogReg:
 
         for i in words:
             tf[i] += 1
+            #tf_extracredit = tf
 
         for t,n in tf.items():
             tf[t] = float(n) / total_count
             
         for ind,t in train_example.nonzero.items():
             df_count = df[ind]
+            #total number of docs: 1059 + 133
             df[ind] = np.log(1192 / (df_count))
 
         for ind,t in train_example.nonzero.items():
             df[ind] = df[ind] * tf[t]
 
+            """
             #keep track of best words for analysis
             self.tf_idf[t] += df[ind] 
+            """
 
         assert len(train_example.x) == len(df)
 
         if use_tfidf == False:
             df = train_example.x
-
-        for i in df:
-            assert i >= 0.0
+        else:
+            for i in df:
+                #tf-idf must be positive
+                assert i >= 0.0
 
         eta = self.eta(iteration)
         y_i = train_example.y
@@ -199,7 +204,7 @@ class LogReg:
 
         self.last_update['number_at'] += 1
 
-        return self.w, df
+        return self.w
 
 
 def eta_schedule(iteration):
@@ -258,6 +263,7 @@ if __name__ == "__main__":
     args = argparser.parse_args()
     train, test, vocab, df = read_dataset(args.positive, args.negative, args.vocab)
 
+    #tf-idf
     tfidf_auto = {k : None for k in vocab}
     tfidf_motor = copy.deepcopy(tfidf_auto)
 
@@ -266,8 +272,16 @@ if __name__ == "__main__":
     # Initialize model
     lr = LogReg(len(vocab), args.lam, lambda x: args.eta)
 
+    
+    #plot arrays
     plot_update = []
     plot_accuracy = []
+    #tf_auto_extracredit = {i : 0 for i in vocab}
+    #tf_cycle_extracredit = {i : 0 for i in vocab}
+    
+
+
+
 
     # Iterations
     iteration = 0
@@ -278,32 +292,50 @@ if __name__ == "__main__":
     for pp in xrange(args.passes):
         random.shuffle(train)
         for ex in train:
-            w, tfidf = lr.sg_update(ex, iteration, use_tfidf)
+            lr.sg_update(ex, iteration, use_tfidf)
             if ex.y == 1:
+                """
                 for ind,t in ex.nonzero.items():
+                    tf_auto_extracredit[t] += tf[t]
                     try:
                         tfidf_auto[t] += tfidf[ind]
                     except TypeError:
                         tfidf_auto[t] = tfidf[ind]
+                """
             elif ex.y == 0:
+                """
                 for ind,t in ex.nonzero.items():
+                    tf_cycle_extracredit[t] += tf[t]
                     try:
                         tfidf_motor[t] += tfidf[ind]
                     except TypeError:
                         tfidf_motor[t] = tfidf[ind]
-
+                """
             if iteration % 5 == 1:
                 train_lp, train_acc = lr.progress(train, vocab)
                 ho_lp, ho_acc = lr.progress(test, vocab)
+                
                 plot_accuracy.append(ho_acc)
                 plot_update.append(iteration)
+                
                 print("Update %i\tTP %f\tHP %f\tTA %f\tHA %f" %
                       (iteration, train_lp, ho_lp, train_acc, ho_acc))
 
             iteration += 1
 
 
-    #dataframes of best,worst features
+
+    #dataframes
+    plot_eta = pd.DataFrame(plot_accuracy, plot_update, columns=['tf-idf: .000001'])
+    plot_eta.to_pickle('tfidf6')
+
+"""
+
+
+    tf_auto = dict(sorted(tf_auto_extracredit.items(), key=operator.itemgetter(1), reverse=True)[:20])
+    tf_cycle = dict(sorted(tf_cycle_extracredit.items(), key=operator.itemgetter(1), reverse=True)[:20])
+    df_auto = pd.DataFrame(tf_auto.items(), columns=['term', 'tf'])
+    df_cycle = pd.DataFrame(tf_cycle.items(), columns=['term', 'tf'])
 
     predict_neg = { k : v for k,v in tfidf_auto.items() if v != None}
     predict_pos = { k : v for k,v in tfidf_motor.items() if v != None}
@@ -318,21 +350,11 @@ if __name__ == "__main__":
     df_best_pos = pd.DataFrame(best_pos.items(), columns=['term', 'tfidf (sum)'])
     df_worst_pos = pd.DataFrame(worst_pos.items(), columns=['term', 'tfidf (sum)'])
 
-    df_best_neg.to_pickle('best_neg')
-    df_worst_neg.to_pickle('worst_neg')
-    df_best_pos.to_pickle('best_pos')
-    df_worst_pos.to_pickle('worst_pos')
-
-    print df_best_pos
-
-"""
-    #Plot for analysis
-    #uncomment import at top
-    plt.ylim(ymin=.45, ymax=1.0)
-    plt.xlim(xmin=0, xmax=5291)
-    plt.plot(plot_update, plot_accuracy, 'g.')
-    plt.ylabel('Accuracy on Test Data')
-    plt.xlabel('Iteration of Update')
-    plt.show()
+    df_best_neg.to_pickle('worst_neg')
+    df_worst_neg.to_pickle('best_neg')
+    df_best_pos.to_pickle('worst_pos')
+    df_worst_pos.to_pickle('best_pos')
+    df_auto.to_pickle('tf_auto')
+    df_cycle.to_pickle('tf_cycle')
 """
     
