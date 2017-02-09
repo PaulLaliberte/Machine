@@ -80,40 +80,26 @@ class LogReg:
         self.eta = eta
         self.last_update = defaultdict(int)
         self.best_predict = None
+        self.tf_idf = defaultdict(float)
 
         self.last_update['number_at'] = 0
 
         assert self.lam>= 0, "Regularization parameter must be non-negative"
 
-    def progress(self, examples, vocab, find_best=False):
+    def progress(self, examples, vocab):
         """
         Given a set of examples, compute the probability and accuracy
         :param examples: The dataset to score
         :return: A tuple of (log probability, accuracy)
         """
 
-        if self.best_predict == None:
-            self.best_predict = {i : None for i in vocab}
-
         logprob = 0.0
         num_right = 0
         for ex in examples:
             p = sigmoid(self.w.dot(ex.x))
             if ex.y == 1:
-                if find_best is True:
-                    for key,value in ex.nonzero.items():
-                        try:
-                            self.best_predict[value] += 1
-                        except TypeError:
-                            self.best_predict[value] = 1
                 logprob += log(p)
             else:
-                if find_best is True:
-                    for key,value in ex.nonzero.items():
-                        try:
-                            self.best_predict[value] -= 1
-                        except TypeError:
-                            self.best_predict[value] = -1
                 logprob += log(1.0 - p)
 
             # Get accuracy
@@ -155,20 +141,24 @@ class LogReg:
 
         for t,n in tf.items():
             tf[t] = float(n) / total_count
-
             
         for ind,t in train_example.nonzero.items():
             df_count = df[ind]
-            df[ind] = np.log(1192 / (1 + df_count))
+            df[ind] = np.log(1192 / (df_count))
 
         for ind,t in train_example.nonzero.items():
             df[ind] = df[ind] * tf[t]
+
+            #keep track of best words for analysis
+            self.tf_idf[t] += df[ind] 
 
         assert len(train_example.x) == len(df)
 
         if use_tfidf == False:
             df = train_example.x
 
+        for i in df:
+            assert i >= 0.0
 
         eta = self.eta(iteration)
         y_i = train_example.y
@@ -209,7 +199,7 @@ class LogReg:
 
         self.last_update['number_at'] += 1
 
-        return self.w
+        return self.w, df
 
 
 def eta_schedule(iteration):
@@ -263,16 +253,21 @@ if __name__ == "__main__":
                            type=str, default="../data/autos_motorcycles/vocab", required=False)
     argparser.add_argument("--passes", help="Number of passes through train",
                            type=int, default=1, required=False)
-    argparser.add_argument("--best", help="Print best/worst words", type=bool, default=False, required=False)
     argparser.add_argument("--tfidf", help="Use tf-idf", type=str, default='False', required=False)
 
     args = argparser.parse_args()
     train, test, vocab, df = read_dataset(args.positive, args.negative, args.vocab)
 
+    tfidf_auto = {k : None for k in vocab}
+    tfidf_motor = copy.deepcopy(tfidf_auto)
+
     print("Read in %i train and %i test" % (len(train), len(test)))
 
     # Initialize model
     lr = LogReg(len(vocab), args.lam, lambda x: args.eta)
+
+    plot_update = []
+    plot_accuracy = []
 
     # Iterations
     iteration = 0
@@ -283,38 +278,54 @@ if __name__ == "__main__":
     for pp in xrange(args.passes):
         random.shuffle(train)
         for ex in train:
-            lr.sg_update(ex, iteration, use_tfidf)
+            w, tfidf = lr.sg_update(ex, iteration, use_tfidf)
+            if ex.y == 1:
+                for ind,t in ex.nonzero.items():
+                    try:
+                        tfidf_auto[t] += tfidf[ind]
+                    except TypeError:
+                        tfidf_auto[t] = tfidf[ind]
+            elif ex.y == 0:
+                for ind,t in ex.nonzero.items():
+                    try:
+                        tfidf_motor[t] += tfidf[ind]
+                    except TypeError:
+                        tfidf_motor[t] = tfidf[ind]
 
             if iteration % 5 == 1:
-                train_lp, train_acc = lr.progress(train, vocab, False)
-                ho_lp, ho_acc = lr.progress(test, vocab, args.best)
+                train_lp, train_acc = lr.progress(train, vocab)
+                ho_lp, ho_acc = lr.progress(test, vocab)
+                plot_accuracy.append(ho_acc)
+                plot_update.append(iteration)
                 print("Update %i\tTP %f\tHP %f\tTA %f\tHA %f" %
                       (iteration, train_lp, ho_lp, train_acc, ho_acc))
+
             iteration += 1
 
-    if args.best == True:
-        #dataframes of best,worst features
 
-        predict_cycle = { k : v for k,v in lr.best_predict_cycle.items() if v != None }
-        predict_auto = { k : v for k,v in lr.best_predict_auto.items() if v != None }
+    #dataframes of best,worst features
 
-        cycle_predict = dict(sorted(predict_cycle.items(), key=operator.itemgetter(1), reverse=True)[:20])
-        auto_predict = dict(sorted(predict_auto.items(), key=operator.itemgetter(1), reverse=True)[:20])
-        worst_cycle = dict(sorted(predict_cycle.items(), key=operator.itemgetter(1))[:20])
-        worst_auto = dict(sorted(predict_auto.items(), key=operator.itemgetter(1))[:20])
+    predict_neg = { k : v for k,v in tfidf_auto.items() if v != None}
+    predict_pos = { k : v for k,v in tfidf_motor.items() if v != None}
 
+    best_neg = dict(sorted(predict_neg.items(), key=operator.itemgetter(1))[:20])
+    best_pos = dict(sorted(predict_pos.items(), key=operator.itemgetter(1))[:20])
+    worst_neg = dict(sorted(predict_neg.items(), key=operator.itemgetter(1), reverse=True)[:20])
+    worst_pos = dict(sorted(predict_pos.items(), key=operator.itemgetter(1), reverse=True)[:20])
 
-        df_best_cycle = pd.DataFrame(cycle_predict.items(), columns=['term', 'count'])
-        df_worst_cycle = pd.DataFrame(worst_cycle.items(), columns=['term', 'count'])
-        df_best_auto = pd.DataFrame(auto_predict.items(), columns=['term', 'count'])
-        df_worst_auto = pd.DataFrame(worst_auto.items(), columns=['term', 'count'])
+    df_best_neg = pd.DataFrame(best_neg.items(), columns=['term', 'tfidf (sum)'])
+    df_worst_neg = pd.DataFrame(worst_neg.items(), columns=['term', 'tfidf (sum)'])
+    df_best_pos = pd.DataFrame(best_pos.items(), columns=['term', 'tfidf (sum)'])
+    df_worst_pos = pd.DataFrame(worst_pos.items(), columns=['term', 'tfidf (sum)'])
 
-        df_best_cycle.to_pickle('best_cycle')
-        df_worst_cycle.to_pickle('worst_cycle')
-        df_best_auto.to_pickle('best_auto')
-        df_worst_auto.to_pickle('worst_auto')
-        
-    """
+    df_best_neg.to_pickle('best_neg')
+    df_worst_neg.to_pickle('worst_neg')
+    df_best_pos.to_pickle('best_pos')
+    df_worst_pos.to_pickle('worst_pos')
+
+    print df_best_pos
+
+"""
     #Plot for analysis
     #uncomment import at top
     plt.ylim(ymin=.45, ymax=1.0)
@@ -323,6 +334,5 @@ if __name__ == "__main__":
     plt.ylabel('Accuracy on Test Data')
     plt.xlabel('Iteration of Update')
     plt.show()
-    """
-
-
+"""
+    
