@@ -3,20 +3,21 @@ import argparse
 import numpy as np
 import copy
 import operator
-import pandas as pd
+#import pandas as pd
 #import matplotlib.pyplot as plt
 
 from numpy import zeros, sign 
 from math import exp, log
 from collections import defaultdict
 
-
 kSEED = 1735
 kBIAS = "BIAS_CONSTANT"
 
 random.seed(kSEED)
 
-#TODO: Fix up analysis, learning rate schedule - if time
+#for test file (warning divide by zero - line 142). A zero isn't possible, only in test. 
+np.seterr(divide='ignore')
+
 
 def sigmoid(score, threshold=20.0):
     """
@@ -48,7 +49,6 @@ class Example:
         self.y = label
         self.x = zeros(len(vocab))
 
-
         for word, count in [x.split(":") for x in words]:
             if word in vocab:
                 assert word != kBIAS, "Bias can't actually appear in document"
@@ -61,9 +61,6 @@ class Example:
             for word, count in [x.split(":") for x in words]:
                 if word in vocab:
                     self.df[vocab.index(word)] = df[vocab.index(word)] 
-
-
-
 
 
 class LogReg:
@@ -86,7 +83,7 @@ class LogReg:
 
         assert self.lam>= 0, "Regularization parameter must be non-negative"
 
-    def progress(self, examples, vocab):
+    def progress(self, examples):
         """
         Given a set of examples, compute the probability and accuracy
         :param examples: The dataset to score
@@ -108,7 +105,7 @@ class LogReg:
 
         return logprob, float(num_right) / float(len(examples))
 
-    def sg_update(self, train_example, iteration, use_tfidf=False):
+    def sg_update(self, train_example, iteration, use_tfidf=False, learning_rate=False):
         """
         Compute a stochastic gradient update to improve the log likelihood.
         :param train_example: The example to take the gradient with respect to
@@ -135,16 +132,18 @@ class LogReg:
         words = [t for idf,t in train_example.nonzero.items()]
         total_count = len(words)
         tf = {t : 0 for idf,t in train_example.nonzero.items()}
+        #tf_extracredit = {t : 0 for idf,t in train_example.nonzero.items()}
 
         for i in words:
             tf[i] += 1
-            #tf_extracredit = tf
+            #tf_extracredit[i] += 1
 
         for t,n in tf.items():
             tf[t] = float(n) / total_count
             
         for ind,t in train_example.nonzero.items():
             df_count = df[ind]
+
             #total number of docs: 1059 + 133
             df[ind] = np.log(1192 / (df_count))
 
@@ -166,6 +165,10 @@ class LogReg:
                 assert i >= 0.0
 
         eta = self.eta(iteration)
+
+        if learning_rate == True:
+            eta = eta_schedule(iteration)
+
         y_i = train_example.y
         sigm = sigmoid(np.dot(self.w, df))
 
@@ -205,12 +208,13 @@ class LogReg:
         self.last_update['number_at'] += 1
 
         return self.w
-
-
+    
 def eta_schedule(iteration):
-    # TODO (extra credit): Update this function to provide an
-    # EFFECTIVE iteration dependent learning rate size.  
-    return 1.0 
+    #1/i increase
+
+    new_eta = args.eta / (1. + (100 * iteration) / (args.passes*1192))
+
+    return new_eta
 
 def read_dataset(positive, negative, vocab, test_proportion=0.1):
     """
@@ -243,7 +247,6 @@ def read_dataset(positive, negative, vocab, test_proportion=0.1):
     return train, test, vocab, df
 
 
-
 if __name__ == "__main__":
     argparser = argparse.ArgumentParser()
     argparser.add_argument("--lam", help="Weight of L2 regression",
@@ -259,64 +262,71 @@ if __name__ == "__main__":
     argparser.add_argument("--passes", help="Number of passes through train",
                            type=int, default=1, required=False)
     argparser.add_argument("--tfidf", help="Use tf-idf", type=str, default='False', required=False)
+    argparser.add_argument("--update", help="Use updated learn rate", type=str, default='False', required=False)
 
     args = argparser.parse_args()
     train, test, vocab, df = read_dataset(args.positive, args.negative, args.vocab)
 
+    """
     #tf-idf
     tfidf_auto = {k : None for k in vocab}
     tfidf_motor = copy.deepcopy(tfidf_auto)
+    """
 
     print("Read in %i train and %i test" % (len(train), len(test)))
 
     # Initialize model
     lr = LogReg(len(vocab), args.lam, lambda x: args.eta)
 
-    
+    """
     #plot arrays
     plot_update = []
     plot_accuracy = []
-    #tf_auto_extracredit = {i : 0 for i in vocab}
-    #tf_cycle_extracredit = {i : 0 for i in vocab}
+    tf_auto_extracredit = {i : 0 for i in vocab}
+    tf_cycle_extracredit = {i : 0 for i in vocab}
+    """
     
-
-
-
-
     # Iterations
     iteration = 0
+
+    #covert to bool
     use_tfidf = False
+    update_learn = False
+
     if args.tfidf == 'True':
         use_tfidf = True
+
+    if args.update == 'True':
+        update_learn = True
 
     for pp in xrange(args.passes):
         random.shuffle(train)
         for ex in train:
-            lr.sg_update(ex, iteration, use_tfidf)
+            lr.sg_update(ex, iteration, use_tfidf, update_learn)
+            """
             if ex.y == 1:
-                """
                 for ind,t in ex.nonzero.items():
                     tf_auto_extracredit[t] += tf[t]
+            
                     try:
                         tfidf_auto[t] += tfidf[ind]
                     except TypeError:
                         tfidf_auto[t] = tfidf[ind]
-                """
+            
             elif ex.y == 0:
-                """
                 for ind,t in ex.nonzero.items():
                     tf_cycle_extracredit[t] += tf[t]
                     try:
                         tfidf_motor[t] += tfidf[ind]
                     except TypeError:
                         tfidf_motor[t] = tfidf[ind]
-                """
+            """
             if iteration % 5 == 1:
-                train_lp, train_acc = lr.progress(train, vocab)
-                ho_lp, ho_acc = lr.progress(test, vocab)
+                train_lp, train_acc = lr.progress(train)
+                ho_lp, ho_acc = lr.progress(test)
                 
-                plot_accuracy.append(ho_acc)
-                plot_update.append(iteration)
+                #plot_accuracy.append(ho_acc)
+                #plot_update.append(iteration)
                 
                 print("Update %i\tTP %f\tHP %f\tTA %f\tHA %f" %
                       (iteration, train_lp, ho_lp, train_acc, ho_acc))
@@ -324,12 +334,10 @@ if __name__ == "__main__":
             iteration += 1
 
 
-
-    #dataframes
-    plot_eta = pd.DataFrame(plot_accuracy, plot_update, columns=['tf-idf: .000001'])
-    plot_eta.to_pickle('tfidf6')
-
 """
+    #dataframes
+    plot_eta = pd.DataFrame(plot_accuracy, plot_update, columns=['ulr: n, tfidf: y'])
+    plot_eta.to_pickle('learn_rate4')
 
 
     tf_auto = dict(sorted(tf_auto_extracredit.items(), key=operator.itemgetter(1), reverse=True)[:20])
@@ -354,7 +362,7 @@ if __name__ == "__main__":
     df_worst_neg.to_pickle('best_neg')
     df_best_pos.to_pickle('worst_pos')
     df_worst_pos.to_pickle('best_pos')
+
     df_auto.to_pickle('tf_auto')
     df_cycle.to_pickle('tf_cycle')
-"""
-    
+"""    
