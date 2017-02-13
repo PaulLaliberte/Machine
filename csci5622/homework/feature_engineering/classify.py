@@ -61,7 +61,7 @@ if __name__ == "__main__":
     lr.fit(x_train, y_train)
 
     #cross validation scores
-    scores = cross_val_score(lr, x_train, y_train, cv=5)
+    scores = cross_val_score(lr, x_train, y_train, cv=10)
 
     feat.show_top10(lr, labels)
 
