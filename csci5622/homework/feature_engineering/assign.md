@@ -1,7 +1,7 @@
 Feature Engineering
 =
 
-Due: 11. November at 11:55pm 
+Due: 24. February at 11:55pm 
 
 The goal of this assignment is to do text classification on social media,
 sorting them into different classes.  We'll be using the logistic regression
@@ -11,8 +11,8 @@ Unlike previous assignments, the code provided with this assignment has all of
 the functionality required.  Your job is to make the functionality better by
 improving the features the code uses for text classification.
 
-*NOTE*: Because the goal of this assignment is feature engineering, not
-classification algorithms, you _may not_ change the underlying algorithm.
+**NOTE**: Because the goal of this assignment is feature engineering, not
+classification algorithms, you _may not_ change the underlying algorithm or it's parameters
 
 It is structured in a way that approximates how classification works in the real
 world: Features are typically underspecified (or not specified at all). You, the
@@ -33,7 +33,7 @@ The job of the written portion of the homework is to convince the grader that:
 
 Make sure that you have examples and quantitative evidence that your
 features are working well.  Be sure to explain how you used the data
-(e.g., did you have a validation set) and how you inspected the
+(e.g., did you have a validation set? did you do cross-validation?) and how you inspected the
 results.
 
 A sure way of getting a low grade is simply listing what you tried and
@@ -62,40 +62,35 @@ predictions on Kaggle, an online tournament site for machine learning
 competitions.  You must sign up with your Colorado e-mail (it's a restricted
 entry competition).
 
-https://inclass.kaggle.com/c/tv-tropes-spoiler-detection
+https://inclass.kaggle.com/c/[#TODO]
 
 In addition:
 * please turn in a file called _analysis.pdf_ explaining your process of
-  creating additional features.  Make sure you state your username there.  This should only be one page of text, but it is okay if graphs spill onto a second page.
+  creating additional features.  Make sure you state your username there.  This should only be one page of text, but it is okay if it's longer due to graphics. 
 * upload your _classify.py_ code that produced your predictions
-
-Your username should be of the form _CU\_IDENTIKEY_ so 
-that we can easily map it to your grade.  If you already have a Kaggle account associated with your @colorado.edu email address you do not need to create a new username.  Please send me a private message on Kaggle sometime before the close of the competition so I can verify your identity. 
 
 The sample code produces a two column CSV file that is correctly formatted for Kaggle (predictions.csv).  It should have the id as the first column and the prediction as the second column.
 
-How this Assignment is Graded (25+ points)
+How this Assignment is Graded (30+ points)
 ------------------------------
 
-10 points of your score will be generated from your performance on the
+15 points of your score will be generated from your performance on the
 the classification competition on Kaggle.  The performance will be
 evaluated on accuracy on a held-out test set.
 
 You should be able to significantly
 improve on the baseline system (i.e. the predictions made by the starter 
-code we've provided) as reported by the Kaggle system.  The top 5 students
-on the private leaderboard at the end of the contest will receive 5 extra
-credit points towards the performance portion of your grade.  In addition, any student that beats Chris' score will receive 2 extra credit points (though if you're in the top 5 you still only get 5 extra credit points).
+code we've provided) as reported by the Kaggle system.  The top 3 students from the undergraduate and and graduate sections 
+on the private leaderboard at the end of the contest will receive 3 extra
+credit points towards the performance portion of your grade.  In addition, any student that beats Aditya's score will receive 2 extra credit points. 
 
 Your writeup explanation is worth 15 points.
 
-Unlike previous homeworks, the writeup is worth relatively more of
-this assignment and will be graded with more scrutiny.  
 
 Questions / Hints
 ----------------
 
-* Don't use all the data until you're ready.  You may want to add a \texttt{--limit}
+* Don't use all the data until you're ready.  You may want to add a --limit 
   option (as was provided in the KNN homework) to use a subset of the data to see how you're doing on smaller
   datasets.
 * Examine the features that are being used.
@@ -126,9 +121,9 @@ No.  This assignment is about your ability to extract meaningful features from t
 
     What sort of improvement is “good” or “enough”?
 
-If you have 5-10% improvement over the baseline with your features, that’s more than sufficient.  If you fail to get that improvement but have tried reasonable features, that satisfies the requirements of assignment.  However, the extra credit for “winning” the class competition depends on the performance of other students.
+If you have 5-10% improvement over the baseline (on the Public Leaderboard) with your features, that’s more than sufficient.  If you fail to get that improvement but have tried reasonable features, that satisfies the requirements of assignment.  However, the extra credit for “winning” the class competition depends on the performance of other students.
 
     Where do I start?  
 
-It might be a good idea to look at the in-class notebook associated with Lecture 15 where we did similar experiments.  This, along with all of the other in-class notebooks, is available in the [csci5622notebooks](https://github.com/chrisketelsen/csci5622notebooks) repo on GitHub. 
+It might be a good idea to look at the in-class notebook associated with Lecture 7 where we did similar experiments.  This, along with all of the other in-class notebooks, is available in the [csci5622notebooks](https://github.com/chrisketelsen/csci5622notebooks) repo on GitHub. 
 

@@ -5,6 +5,7 @@ from numpy import array
 
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import SGDClassifier
+from sklearn.model_selection import cross_val_score
 
 kTARGET_FIELD = 'spoiler'
 kTEXT_FIELD = 'sentence'
@@ -59,11 +60,18 @@ if __name__ == "__main__":
     lr = SGDClassifier(loss='log', penalty='l2', shuffle=True)
     lr.fit(x_train, y_train)
 
+    #cross validation scores
+    scores = cross_val_score(lr, x_train, y_train, cv=5)
+
     feat.show_top10(lr, labels)
 
     predictions = lr.predict(x_test)
-    o = DictWriter(open("predictions.csv", 'w'), ["id", "spoiler"])
+    o = DictWriter(open("predictions.csv", 'w'), ["Id", "spoiler"])
     o.writeheader()
-    for ii, pp in zip([x['id'] for x in test], predictions):
-        d = {'id': ii, 'spoiler': labels[pp]}
+    for ii, pp in zip([x['Id'] for x in test], predictions):
+        d = {'Id': ii, 'spoiler': labels[pp]}
         o.writerow(d)
+
+    print '\n'
+    print "Accuracy: %0.2f (+/- %0.2f)" % (scores.mean(), scores.std() * 2)
+
