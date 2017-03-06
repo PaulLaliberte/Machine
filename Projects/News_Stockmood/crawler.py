@@ -22,7 +22,6 @@ def readin_csv():
 class crawler:
 
     def __init__(self, ticker_list=None):
-        #(javascript_bool, url)
         self.stock_ticker = ticker_list
         self.df = None
 
