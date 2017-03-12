@@ -1,4 +1,5 @@
 from math import pi, sin
+import argparse
 
 kSIMPLE_TRAIN = [(1, False), (2, True), (4, False), (5, True), (13, False),
                  (14, True), (19, False)]
@@ -27,6 +28,7 @@ class SinClassifier:
         Args:
           k: The exponent in x = 2**(-k) (an integer)
         """
+
         return sin(self.w * 2 ** (-k))
 
     def classify(self, k):
@@ -60,12 +62,39 @@ def train_sin_classifier(data):
     assert all(isinstance(k[1], bool) for k in data), \
         "All labels must be True / False"
 
-    # TODO: Compute a parameter w that will correctly classify the dataset
+    arr = []
+    for l in data:
+        binary_class = 1
+        if l[1] == False:
+            binary_class = -1
 
-    w = 1.0 * pi  
+        arr.append(((1. - binary_class) * (2**l[0]))/2.)
+
+    w = pi * (1 + sum(arr))
+
     return SinClassifier(w)
 
 if __name__ == "__main__":
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("--cs", help="Example: cannot shatter 4 points",
+                           type=str, default=False, required=False)
+
+    args = argparser.parse_args()
+
     classifier = train_sin_classifier(kSIMPLE_TRAIN)
     for kk, yy in kSIMPLE_TRAIN:
         print(kk, yy, classifier(kk), classifier.classify(kk))
+
+    if args.cs == 'yes' or args.cs == 'Yes' or args.cs == 'y' or args.cs == 'Y':
+        print '\n'
+
+        cannot_shatter = [(1, False), (2, False), (3, True), (4, False)]
+
+        print "Example of not begin able to shatter 4 points of equal distance and the following labeling: %s" % cannot_shatter
+
+        print '\n'
+
+        for kk, yy in cannot_shatter:
+            print(kk, yy, classifier(kk), classifier.classify(kk))
+
+
