@@ -27,8 +27,10 @@ class TestSVM(unittest.TestCase):
         w = np.array([0.2, 0.8])
         b = -0.2
 
+
         self.assertEqual(find_support(self.sep_x, self.sep_y, w, b),
                          set([0, 4, 2]))
+
 
     def test_weight(self):
         alpha = np.zeros(len(self.sep_x))
