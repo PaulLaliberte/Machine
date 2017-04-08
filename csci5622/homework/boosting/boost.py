@@ -1,11 +1,29 @@
 import argparse
 import numpy as np 
+from sklearn import metrics
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import Perceptron
 from sklearn.base import clone 
 import matplotlib.pyplot as plt
 
 np.random.seed(1234)
+
+"""
+X = np.array([
+[6,9.5],
+[4,8.5],
+[9,8.75],
+[8,8.0],
+[3,7],
+[1,6.5],
+[5,6.5],
+[1.5,2.5],
+[2,1],
+[9,2],
+])
+y = np.array([1,1,-1,1,-1,1,-1,1,-1,-1])
+"""
+
 
 class FoursAndNines:
     """
@@ -46,7 +64,7 @@ class FoursAndNines:
         f.close()
 
 class AdaBoost:
-    def __init__(self, n_learners=20, base=DecisionTreeClassifier(max_depth=1)):
+    def __init__(self, n_learners=20, base=DecisionTreeClassifier(max_depth=1, criterion='entropy')):
         """
         Create a new adaboost classifier.
         
@@ -65,6 +83,7 @@ class AdaBoost:
         self.base = base
         self.alpha = np.zeros(self.n_learners)
         self.learners = []
+        self.boosting_scores = []   #individual boosting scores for each iteration
         
     def fit(self, X_train, y_train):
         """
@@ -75,16 +94,23 @@ class AdaBoost:
             y_train (ndarray): [n_samples] ndarray of data 
         """
 
-        # TODO 
+        K, _ = X_train.shape
+        w = np.ones(K) / K
 
-        # Hint: You can create and train a new instantiation 
-        # of your sklearn weak learner as follows 
+        for m in range(0, self.n_learners):
+            learner = clone(self.base)
+            learner.fit(X_train, y_train, sample_weight=w)
 
-        w = np.ones(len(y_train))
-        h = clone(self.base)
-        h.fit(X_train, y_train, sample_weight=w)
-            
-            
+            pred = learner.predict(X_train)
+
+            err_m = w.dot(pred != y_train) / sum(w)
+
+            self.alpha[m] = .5 * (np.log((1 - err_m) / err_m))
+
+            w = w * np.exp(-self.alpha[m] * y_train * pred)
+
+            self.learners.append(learner)
+
     def predict(self, X):
         """
         Adaboost prediction for new data X.
@@ -96,9 +122,15 @@ class AdaBoost:
             [n_samples] ndarray of predicted labels {-1,1}
         """
 
-        # TODO 
+        predicted = np.zeros(len(X))
+        for m in range(0, len(self.learners)):
+            predicted += self.alpha[m] * self.learners[m].predict(X)
+            boost_pred = [np.sign(i) for i in predicted]
+            self.boosting_scores.append(boost_pred)
 
-        return np.zeros(X.shape[0])
+        predicted = [np.sign(i) for i in predicted]
+
+        return predicted
     
     def score(self, X, y):
         """
@@ -112,9 +144,15 @@ class AdaBoost:
             Prediction accuracy (between 0.0 and 1.0).
         """
 
-        # TODO 
+        predicted = self.predict(X)
+        total = len(y)
+        correct = 0.0
 
-        return 0.0
+        for i in range(0, len(predicted)):
+            if predicted[i] == y[i]:
+                correct += 1.0
+
+        return correct / total
     
     def staged_score(self, X, y):
         """
@@ -130,10 +168,14 @@ class AdaBoost:
             [n_learners] ndarray of scores 
         """
 
-        # TODO 
+        staged_scores = []
+        temp_learners = self.learners
 
-        return  np.zeros(self.n_learners)
+        for i in range(0, len(self.learners)):
+            self.learners = temp_learners[:i+1]
+            staged_scores.append(self.score(X,y))
 
+        return staged_scores
 
 def mnist_digit_show(flatimage, outname=None):
 
@@ -149,6 +191,7 @@ def mnist_digit_show(flatimage, outname=None):
 	else:
 	    plt.show()
 
+"""
 if __name__ == "__main__":
 
 	parser = argparse.ArgumentParser(description='AdaBoost classifier options')
@@ -161,8 +204,14 @@ if __name__ == "__main__":
 	data = FoursAndNines("../data/mnist.pkl.gz")
 
     # An example of how your classifier might be called 
-	clf = AdaBoost(n_learners=50, base=DecisionTreeClassifier(max_depth=1, criterion="entropy"))
-	clf.fit(data.x_train, data.y_train)
+	clf = AdaBoost(n_learners=400, base=DecisionTreeClassifier(max_depth=1, criterion="entropy"))
+        clf.fit(data.x_train[:args.limit], data.y_train[:args.limit])
+        predicted = clf.predict(data.x_test)
+        expected = data.y_test
 
+        print "Classification report for classifier %s:\n%s\n" % (clf, metrics.classification_report(expected,
+                                                                                                     predicted))
 
+        print "Confusion matrix:\n%s" % metrics.confusion_matrix(expected, predicted)
 
+"""
