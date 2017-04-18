@@ -37,7 +37,6 @@ if __name__ == "__main__":
     train_data = processData(df_train)
     test_data = processData(df_test, False)
     
-
     clf = RandomForestClassifier(n_estimators=100)
     clf.fit(train_data[0:, 2:], train_data[0:, 0])
 
