@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import Imputer
 
 #NOTE: SCORE=.73206
 
@@ -44,10 +43,8 @@ if __name__ == "__main__":
 
     output = clf.predict(test_data[:,1:])
 
-    print(output)
-
     result = np.c_[test_data[:,0].astype(int), output.astype(int)]
     df_result = pd.DataFrame(result[:,0:2], columns=['PassengerId', 'Survived'])
 
-    #df_result.to_csv('titanic_rforest.csv', index=False)
+    df_result.to_csv('titanic_rforest.csv', index=False)
 
