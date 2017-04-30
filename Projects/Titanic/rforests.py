@@ -5,20 +5,20 @@ import numpy as np
 
 from sklearn.ensemble import RandomForestClassifier
 
-#NOTE: SCORE=.73206
+#NOTE: SCORE ~ 74-75
 
 def processData(df, train=True):
-    df = df.drop(['Name', 'Ticket', 'Cabin', 'Embarked'], axis=1)
+    df = df.drop(['Name', 'Ticket', 'Cabin', 'Embarked', 'SibSp', 'Parch'], axis=1)
 
     mean_age = df['Age'].mean()
     df['Age'] = df['Age'].fillna(mean_age)
+
+    df['Gender'] = df['Sex'].map({'male' : 0, 'female' : 1}).astype(int)
 
     fare_means = df.pivot_table('Fare', index='Pclass', aggfunc='mean')
     df_test['Fare'] = df_test[['Fare', 'Pclass']].apply(lambda x:
                             fare_means[x['Pclass']] if pd.isnull(x['Fare'])
                             else x['Fare'], axis=1)
-
-    df['Gender'] = df['Sex'].map({'male' : 0, 'female' : 1}).astype(int)
 
     df = df.drop(['Sex'], axis=1)
 
@@ -45,5 +45,5 @@ if __name__ == "__main__":
     result = np.c_[test_data[:,0].astype(int), output.astype(int)]
     df_result = pd.DataFrame(result[:,0:2], columns=['PassengerId', 'Survived'])
 
-    df_result.to_csv('titanic_rforest.csv', index=False)
+    df_result.to_csv('titanic_rforest_features.csv', index=False)
 
