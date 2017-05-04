@@ -1,7 +1,7 @@
 import argparse
 import numpy as np 
 import cPickle, gzip
-import matplotlib.pyplot as plt
+
 
 class Network:
     def __init__(self, sizes):
@@ -9,6 +9,8 @@ class Network:
         self.sizes = sizes
         self.biases = [np.random.randn(n, 1) for n in self.sizes[1:]]
         self.weights = [np.random.randn(n, m) for (m,n) in zip(self.sizes[:-1], self.sizes[1:])]
+        self.train_acc = []
+        self.test_acc = []
         
     def g(self, z):
         """
@@ -54,14 +56,18 @@ class Network:
                 xk = train[perm[kk]][0]
                 yk = train[perm[kk]][1]
                 dWs, dbs = self.back_prop(xk, yk)
-                # TODO: Add L2-regularization 
-                self.weights = [W - eta*dW for (W, dW) in zip(self.weights, dWs)]
+                #l2-regularized --- Update rule: (1 - 2 * eta * lam * .5) = (1 - eta * lam)
+                
+                self.weights = [(1 - eta*lam) * W - eta*dW for (W, dW) in zip(self.weights, dWs)]
                 self.biases = [b - eta*db for (b, db) in zip(self.biases, dbs)]
+
             if verbose:
                 if epoch==0 or (epoch + 1) % 50 == 0:
                     acc_train = self.evaluate(train)
+                    self.train_acc.append(acc_train)
                     if test is not None:
                         acc_test = self.evaluate(test)
+                        self.test_acc.append(acc_test)
                         print "Epoch {:4d}: Train {:10.5f}, Test {:10.5f}".format(epoch+1, acc_train, acc_test) 
                     else:
                         print "Epoch {:4d}: Train {:10.5f}".format(epoch+1, acc_train)    
@@ -84,12 +90,14 @@ class Network:
             a_list.append(a)
             
         # Back propagate deltas to compute derivatives 
-        # TODO delta  = 
+
+        delta = self.gradC(a_list[-1], y) * self.g_prime(z_list[-1])
+
         for ell in range(self.L-2,-1,-1):
-            # TODO db_list[ell] = 
-            # TODO dW_list[ell] = 
-            # TODO delta = 
-        
+            db_list[ell] = delta
+            dW_list[ell] = np.dot(delta, a_list[ell].transpose())
+            delta = np.dot(self.weights[ell].transpose(), delta) * self.g_prime(z_list[ell])
+
         return (dW_list, db_list)
     
     def evaluate(self, test):
@@ -137,14 +145,43 @@ class Network:
             for ii in range(self.weights[ell].shape[0]):
                 # Check weights in level W[ell][ii,jj] 
                 for jj in range(self.weights[ell].shape[1]):
-                    # TODO true_dW = 
-                    # TODO num_dW = 
+                    true_dW = dWs[ell][ii][jj]
+                    
+                    temp = self.weights[ell][ii][jj]
+
+                    self.weights[ell][ii][jj] += EPS 
+                    loss1 = self.compute_cost(xk, yk)
+                    
+                    self.weights[ell][ii][jj] = temp
+                    
+                    self.weights[ell][ii][jj] -= EPS   
+                    loss2 = self.compute_cost(xk, yk)
+                    
+                    num_dW = (loss1 - loss2) / (2 * EPS)
+                    
+                    self.weights[ell][ii][jj] = temp
+
                     rel_dW = np.abs(true_dW-num_dW)/np.abs(true_dW)
                     print "w: {: 12.10e}  {: 12.10e} {: 12.10e}".format(true_dW, num_dW, rel_dW)
                     rel_errors.append(rel_dW)
-                # Check bias b[ell][ii]
-                # TODO true_db = 
-                # TODO num_db = 
+
+
+                true_db = dbs[ell][ii][0]
+            
+                temp = self.biases[ell][ii][0]
+                
+                self.biases[ell][ii][0] += EPS
+                loss1 = self.compute_cost(xk, yk)
+                
+                self.biases[ell][ii][0] = temp
+                
+                self.biases[ell][ii][0] -= EPS
+                loss2 = self.compute_cost(xk, yk)
+                
+                num_db = (loss1 - loss2) / (2 * EPS)
+                
+                self.biases[ell][ii][0] = temp
+                
                 rel_db = np.abs(true_db-num_db)/np.abs(true_db)
                 print "b: {: 12.10e}  {: 12.10e} {: 12.10e}".format(true_db, num_db, rel_db)
                 rel_errors.append(rel_db)
@@ -158,27 +195,20 @@ def sigmoid(z, threshold=20):
 def sigmoid_prime(z):
     return sigmoid(z) * (1.0 - sigmoid(z))
 
-def mnist_digit_show(flatimage, outname=None):
 
-	import matplotlib.pyplot as plt
-
-	image = np.reshape(flatimage, (-1,14))
-
-	plt.matshow(image, cmap=plt.cm.binary)
-	plt.xticks([])
-	plt.yticks([])
-	if outname: 
-	    plt.savefig(outname)
-	else:
-	    plt.show()
 
 if __name__ == "__main__":
-
+    
     f = gzip.open('../data/tinyTOY.pkl.gz', 'rb') # change path to ../data/tinyMNIST.pkl.gz after debugging
+    train, test = cPickle.load(f)
+
+    nn = Network([2,100,2])
+    nn.SGD_train(train, epochs=500, eta=.25, lam=0.0, verbose=True, test=test)
+    
+
+    f = gzip.open('../data/tinyMNIST.pkl.gz', 'rb')
+
     train, test = cPickle.load(f) 
 
-    nn = Network([2,30,2])
-    nn.SGD_train(train, epochs=200, eta=0.25, lam=0.0, verbose=True, test=test)
-
-
-
+    nn = Network([196,100,10])
+    nn.SGD_train(train, epochs=100, eta=0.25, lam=0.001, verbose=True, test=test)
